@@ -9,9 +9,9 @@ local Players = game:GetService("Players")
 local AttributeService = {}
 
 local DEFAULTS = {
-	Posture     = 100,
-	State       = "Idle",
-	IsStunned   = false,
+	Posture = 100,
+	State = "Idle",
+	IsStunned = false,
 	ParryWindow = false,
 	IsBlocking  = false,
 }

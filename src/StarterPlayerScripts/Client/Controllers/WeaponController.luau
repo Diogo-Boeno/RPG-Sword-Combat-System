@@ -141,9 +141,7 @@ local function attack()
 end
 
 local function startBlock()
-	print("[DBG] startBlock chamado | canAttack=", canAttack, " isBlocking=", isBlocking, " isSheathing=", isSheathing, " blockTrack=", blockTrack)
 	if not canAttack or isBlocking or isSheathing then
-		print("[DBG] startBlock SAIU CEDO")
 		return
 	end
 	isBlocking = true
@@ -167,7 +165,6 @@ end
 
 local function onInputBegan(input, gameProcessed)
 	if input.KeyCode == Enum.KeyCode.F then
-		print("[DBG] F detectado | gameProc=", gameProcessed, " currentWeapon=", currentWeapon, " isSheathing=", isSheathing, " IsStunned=", character and character:GetAttribute("IsStunned"))
 	end
 	if gameProcessed or not currentWeapon or isSheathing then return end
 	if character:GetAttribute("IsStunned") then return end
@@ -243,7 +240,6 @@ local function playSheath(onComplete)
 
 		-- Se a geração mudou (player re-equipou no meio), NÃO mexer no estado novo
 		if gen ~= equipGeneration then
-			print("[DBG] playSheath.Stopped ORFÃO ignorado (gen=", gen, "atual=", equipGeneration, ")")
 			return
 		end
 
@@ -316,18 +312,15 @@ local function onEquipped(weaponName, model)
 
 	-- CAS bindado no Start, persiste pra sempre (não depende de equip/unequip)
 	runningConn    = humanoid.Running:Connect(updateMovement)
-	print("[DBG] onEquipped pronto, gen=", equipGeneration)
 
 	isSheathing = true
 	canAttack = false
 	nextAttackTime = 0
-	print("[DBG] onEquipped: setando isSheathing=true, tocando unsheath")
 
 	unsheathTrack:Play(0.1)
 
 	local releaseConn
 	releaseConn = unsheathTrack:GetMarkerReachedSignal("SheathRelease"):Connect(function()
-		print("[DBG] SheathRelease marker atingido -> isSheathing=false, canAttack=true")
 		MoveToHand:FireServer()
 		releaseConn:Disconnect()
 
@@ -349,7 +342,7 @@ local function onEquipped(weaponName, model)
 	fallbackConn = unsheathTrack.Stopped:Connect(function()
 		fallbackConn:Disconnect()
 		if isSheathing then
-			print("[WeaponController] Não achou o marker de release")
+			warn("[WeaponController] Não achou o marker de release")
 			MoveToHand:FireServer()
 			isSheathing = false
 			grantCanAttack()
@@ -392,7 +385,6 @@ function WeaponController:Start()
 	-- Bind via ContextActionService (1x, persiste pra sempre)
 	ContextActionService:BindAction("WeaponAttack", function(_, state)
 		if state == Enum.UserInputState.Begin then
-			print("[CAS] Attack input | currentWeapon=", currentWeapon, " canAttack=", canAttack, " isSheathing=", isSheathing)
 			if not currentWeapon or isSheathing then return Enum.ContextActionResult.Pass end
 			if character and character:GetAttribute("IsStunned") then return Enum.ContextActionResult.Pass end
 			attack()
@@ -401,7 +393,6 @@ function WeaponController:Start()
 	end, false, Enum.UserInputType.MouseButton1)
 
 	ContextActionService:BindAction("WeaponBlock", function(_, state)
-		print("[CAS] Block input state=", state, " currentWeapon=", currentWeapon, " canAttack=", canAttack, " isSheathing=", isSheathing)
 		if state == Enum.UserInputState.Begin then
 			if not currentWeapon or isSheathing then return Enum.ContextActionResult.Pass end
 			if character and character:GetAttribute("IsStunned") then return Enum.ContextActionResult.Pass end
@@ -418,7 +409,6 @@ function WeaponController:Start()
 	end)
 
 	WeaponEquipped.OnClientEvent:Connect(function(weaponName, model)
-		print("[DBG] WeaponEquipped recebido:", weaponName, "| currentWeapon atual=", currentWeapon)
 		if currentWeapon then
 			equipGeneration += 1
 			isSheathing = false
@@ -430,7 +420,6 @@ function WeaponController:Start()
 	end)
 
 	WeaponUnequipped.OnClientEvent:Connect(function()
-		print("[DBG] WeaponUnequipped recebido | currentWeapon=", currentWeapon, "isSheathing=", isSheathing)
 		if currentWeapon and not isSheathing then
 			playSheath(function() end)
 		end

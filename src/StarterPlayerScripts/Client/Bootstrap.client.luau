@@ -8,6 +8,4 @@ local Loader = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Mo
 
 local Controllers = script.Parent:WaitForChild("Controllers")
 
-print("[Bootstrap/Client] Iniciando...")
 Loader.LoadFolder(Controllers)
-print("[Bootstrap/Client] Pronto")

@@ -3,6 +3,4 @@ local Loader = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Mo
 
 local Services = script.Parent:WaitForChild("Services")
 
-print("[Bootstrap/Server] Iniciando...")
 Loader.LoadFolder(Services)
-print("[Bootstrap/Server] Pronto")

@@ -68,7 +68,6 @@ function Loader.LoadFolder(folder)
 			table.insert(modules, { name = s.Name, module = m, instance = s })
 		end
 	end
-	print(("[Loader] %d module(s) carregados de %s"):format(#modules, folder:GetFullName()))
 	runLifecycle(modules)
 	return modules
 end
