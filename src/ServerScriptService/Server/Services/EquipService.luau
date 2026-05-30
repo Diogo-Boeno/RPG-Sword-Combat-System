@@ -65,8 +65,8 @@ local function onUnequip(player)
 end
 
 function EquipService:Init()
-	EquipRemote    = getOrCreate(ReplicatedStorage, "EquipRemote",    "RemoteEvent")
-	UnequipRemote  = getOrCreate(ReplicatedStorage, "UnequipRemote",  "RemoteEvent")
+	EquipRemote = getOrCreate(ReplicatedStorage, "EquipRemote",    "RemoteEvent")
+	UnequipRemote = getOrCreate(ReplicatedStorage, "UnequipRemote",  "RemoteEvent")
 	ValidateWeapon = getOrCreate(ReplicatedStorage, "ValidateWeapon", "RemoteEvent")
 end
 

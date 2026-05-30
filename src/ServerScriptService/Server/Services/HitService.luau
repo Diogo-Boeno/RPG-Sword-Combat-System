@@ -164,6 +164,15 @@ local function onPlayerEvent(player, action, weaponName, target)
 
 	if action == "Attack" then
 		character:SetAttribute("State", "Attacking")
+		local stats = WeaponSettings[weaponName]
+		if stats then
+			local cooldown = stats.Cooldown / stats.SwingSpeed
+			task.delay(cooldown, function()
+				if character and character.Parent and character:GetAttribute("State") == "Attacking" then
+					character:SetAttribute("State", "Idle")
+				end
+			end)
+		end
 		return
 	elseif action == "BlockStart" then
 		character:SetAttribute("IsBlocking", true)
@@ -190,11 +199,11 @@ end
 -- ─── Lifecycle ───────────────────────────────────────────────
 
 function HitService:Init()
-	WeaponSettings    = require(ReplicatedStorage:WaitForChild("WeaponRegistry"))
-	HitEffectPrefab   = ServerStorage:WaitForChild("HitEffect")
+	WeaponSettings = require(ReplicatedStorage:WaitForChild("WeaponRegistry"))
+	HitEffectPrefab = ServerStorage:WaitForChild("HitEffect")
 	ParryEffectPrefab = ServerStorage:WaitForChild("ParryEffect")
 	BlockEffectPrefab = ServerStorage:WaitForChild("BlockEffect")
-	Sounds            = ServerStorage:WaitForChild("Sounds")
+	Sounds = ServerStorage:WaitForChild("Sounds")
 
 	-- SwordHit historicamente fica direto em ReplicatedStorage (não em Remotes/).
 	-- Mantemos lá pra não quebrar referências antigas.

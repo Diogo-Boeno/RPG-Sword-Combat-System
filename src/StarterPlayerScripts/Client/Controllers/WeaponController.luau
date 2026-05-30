@@ -1,13 +1,4 @@
---[[
-	WeaponController
-	Input de combate, animations, hitbox, sheath/unsheath.
-	Era: StarterPlayerScripts.Handler(tool)
-
-	Nota: depende do character. Inicializa pela primeira vez no Start e re-bind no respawn.
---]]
-
-local Players           = game:GetService("Players")
-local UserInputService  = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,7 +13,7 @@ local WeaponEquipped, WeaponUnequipped, MoveToHand, MoveToScabbard
 
 -- Tunables
 local FULL_COMBO_COOLDOWN = 1
-local COMBO_RESET_TIME    = 2
+local COMBO_RESET_TIME = 2
 -- local PARRY_COOLDOWN_TIME = 3 -- (original não usa, mantemos sem)
 
 -- Per-character state (reset por respawn)
@@ -30,12 +21,11 @@ local character, humanoid, animator
 local currentWeapon, weaponModel
 local idleTrack, walkTrack, blockTrack, unsheathTrack, sheathTrack
 local attackTracks = {}
--- Variáveis de conn não mais usadas (CAS gerencia)
+
 local hitbox
 local stopConn
-local runningConn, stunConn
+local runningConn,stunConn
 local equipGeneration = 0
-local lastComboEndTime = 0
 local nextAttackTime = 0
 local currentAttack = 1
 local canAttack = false
@@ -132,7 +122,6 @@ local function attack()
 		character:SetAttribute("State", "Idle")
 		if isLastHit then
 			currentAttack = 1
-			lastComboEndTime = os.clock()
 		else
 			currentAttack += 1
 		end
@@ -163,35 +152,17 @@ local function stopBlock()
 	updateMovement()
 end
 
-local function onInputBegan(input, gameProcessed)
-	if input.KeyCode == Enum.KeyCode.F then
-	end
-	if gameProcessed or not currentWeapon or isSheathing then return end
-	if character:GetAttribute("IsStunned") then return end
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		attack()
-	elseif input.KeyCode == Enum.KeyCode.F then
-		startBlock()
-	end
-end
-
-local function onInputEnded(input)
-	if input.KeyCode == Enum.KeyCode.F then
-		if isBlocking then stopBlock() end
-	end
-end
-
 local function cleanupTracks()
-	if runningConn    then runningConn:Disconnect();    runningConn = nil    end
-	if stunConn       then stunConn:Disconnect();       stunConn = nil       end
+	if runningConn then runningConn:Disconnect();    runningConn = nil    end
+	if stunConn then stunConn:Disconnect();       stunConn = nil       end
 	if hitbox and hitbox.HitStop then hitbox:HitStop() end
 	hitbox = nil
 
-	if idleTrack     then idleTrack:Stop(0);     idleTrack:Destroy();     idleTrack = nil     end
-	if walkTrack     then walkTrack:Stop(0);     walkTrack:Destroy();     walkTrack = nil     end
-	if blockTrack    then blockTrack:Stop(0);    blockTrack:Destroy();    blockTrack = nil    end
+	if idleTrack then idleTrack:Stop(0); idleTrack:Destroy(); idleTrack = nil     end
+	if walkTrack then walkTrack:Stop(0); walkTrack:Destroy(); walkTrack = nil     end
+	if blockTrack then blockTrack:Stop(0); blockTrack:Destroy(); blockTrack = nil    end
 	if unsheathTrack then unsheathTrack:Stop(0); unsheathTrack:Destroy(); unsheathTrack = nil end
-	if sheathTrack   then sheathTrack:Stop(0);   sheathTrack:Destroy();   sheathTrack = nil   end
+	if sheathTrack then sheathTrack:Stop(0); sheathTrack:Destroy(); sheathTrack = nil   end
 
 	for _, t in ipairs(attackTracks) do
 		t:Stop(0)
@@ -257,16 +228,16 @@ end
 local function onEquipped(weaponName, model)
 	equipGeneration += 1
 	currentWeapon = weaponName
-	weaponModel   = model
+	weaponModel = model
 
 	local animFolder = model:WaitForChild("Animations")
-	local atkFolder  = animFolder:WaitForChild("AtkAnimations")
+	local atkFolder = animFolder:WaitForChild("AtkAnimations")
 
-	idleTrack     = animator:LoadAnimation(animFolder:WaitForChild("Idle"))
-	walkTrack     = animator:LoadAnimation(animFolder:WaitForChild("Walk"))
-	blockTrack    = animator:LoadAnimation(animFolder:WaitForChild("Block"))
+	idleTrack = animator:LoadAnimation(animFolder:WaitForChild("Idle"))
+	walkTrack = animator:LoadAnimation(animFolder:WaitForChild("Walk"))
+	blockTrack = animator:LoadAnimation(animFolder:WaitForChild("Block"))
 	unsheathTrack = animator:LoadAnimation(animFolder:WaitForChild("Unsheath"))
-	sheathTrack   = animator:LoadAnimation(animFolder:WaitForChild("Sheath"))
+	sheathTrack = animator:LoadAnimation(animFolder:WaitForChild("Sheath"))
 
 	blockTrack.Priority = Enum.AnimationPriority.Action
 	blockTrack.Looped = true
@@ -317,13 +288,21 @@ local function onEquipped(weaponName, model)
 	canAttack = false
 	nextAttackTime = 0
 
+	local gen = equipGeneration
+
+	while unsheathTrack.Length == 0 do
+		task.wait()
+	end
+
 	unsheathTrack:Play(0.1)
 
+	-- Marker (meio da animação): só move a lâmina pra mão (visual).
 	local releaseConn
 	releaseConn = unsheathTrack:GetMarkerReachedSignal("SheathRelease"):Connect(function()
-		MoveToHand:FireServer()
 		releaseConn:Disconnect()
+		if gen ~= equipGeneration then return end
 
+		MoveToHand:FireServer()
 		isSheathing = false
 		local remaining = nextAttackTime - os.clock()
 		if remaining <= 0 then
@@ -338,16 +317,22 @@ local function onEquipped(weaponName, model)
 		updateMovement()
 	end)
 
-	local fallbackConn
-	fallbackConn = unsheathTrack.Stopped:Connect(function()
-		fallbackConn:Disconnect()
+	-- Fim da animação: avisa o server que terminou (libera a fila).
+	local stoppedConn
+	stoppedConn = unsheathTrack.Stopped:Connect(function()
+		stoppedConn:Disconnect()
+		if gen ~= equipGeneration then return end
+
+		-- Fallback: se o marker não disparou, garante o blade na mão.
 		if isSheathing then
-			warn("[WeaponController] Não achou o marker de release")
 			MoveToHand:FireServer()
 			isSheathing = false
 			grantCanAttack()
 			updateMovement()
 		end
+
+		local UnsheathFinish = Remotes:FindFirstChild("SheathFinish")
+		if UnsheathFinish then UnsheathFinish:FireServer() end
 	end)
 
 	updateMovement()
@@ -374,10 +359,10 @@ function WeaponController:Init()
 	RaycastHitbox  = require(ReplicatedStorage:WaitForChild("RaycastHitboxV4"))
 	SwordHitEvent  = ReplicatedStorage:WaitForChild("SwordHit")
 
-	Remotes          = ReplicatedStorage:WaitForChild("Remotes")
-	WeaponEquipped   = Remotes:WaitForChild("WeaponEquipped")
+	Remotes = ReplicatedStorage:WaitForChild("Remotes")
+	WeaponEquipped = Remotes:WaitForChild("WeaponEquipped")
 	WeaponUnequipped = Remotes:WaitForChild("WeaponUnequipped")
-	MoveToHand       = Remotes:WaitForChild("MoveToHand")
+	MoveToHand = Remotes:WaitForChild("MoveToHand")
 	MoveToScabbard   = Remotes:WaitForChild("MoveToScabbard")
 end
 

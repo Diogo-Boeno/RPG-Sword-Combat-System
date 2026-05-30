@@ -12,7 +12,7 @@ local HotbarController = {}
 
 local player = Players.LocalPlayer
 
-local EquipWeapon, UnequipWeapon, LoadoutChanged
+local EquipWeapon, WeaponEquipped, WeaponUnequipped, LoadoutChanged
 
 local hotbarLoadout = {}
 local unlockedList  = {}
@@ -38,23 +38,26 @@ local function notifyUI()
 	if evt then evt:Fire(hotbarLoadout, unlockedList, currentSlot) end
 end
 
+-- Só manda o slot pressionado. O SERVER decide equip vs unequip e confirma
+-- via WeaponEquipped / WeaponUnequipped. O client não adivinha o estado.
 local function equipSlot(slot)
 	if not hotbarLoadout[slot] then return end
-	if currentSlot == slot then
-		UnequipWeapon:FireServer()
-		currentSlot = nil
-	else
-		currentSlot = slot
-		EquipWeapon:FireServer(slot)
+	EquipWeapon:FireServer(slot)
+end
+
+local function slotForWeapon(weaponName)
+	for slot, name in pairs(hotbarLoadout) do
+		if name == weaponName then return slot end
 	end
-	notifyUI()
+	return nil
 end
 
 function HotbarController:Init()
-	local Remotes  = ReplicatedStorage:WaitForChild("Remotes")
-	EquipWeapon    = Remotes:WaitForChild("EquipWeapon")
-	UnequipWeapon  = Remotes:WaitForChild("UnequipWeapon")
-	LoadoutChanged = Remotes:WaitForChild("LoadoutChanged")
+	local Remotes    = ReplicatedStorage:WaitForChild("Remotes")
+	EquipWeapon      = Remotes:WaitForChild("EquipWeapon")
+	WeaponEquipped   = Remotes:WaitForChild("WeaponEquipped")
+	WeaponUnequipped = Remotes:WaitForChild("WeaponUnequipped")
+	LoadoutChanged   = Remotes:WaitForChild("LoadoutChanged")
 end
 
 function HotbarController:Start()
@@ -62,6 +65,17 @@ function HotbarController:Start()
 		if gameProcessed then return end
 		local slot = KEY_TO_SLOT[input.KeyCode]
 		if slot then equipSlot(slot) end
+	end)
+
+	-- O destaque do slot segue o que o SERVER confirmou, não o palpite do client.
+	WeaponEquipped.OnClientEvent:Connect(function(weaponName)
+		currentSlot = slotForWeapon(weaponName)
+		notifyUI()
+	end)
+
+	WeaponUnequipped.OnClientEvent:Connect(function()
+		currentSlot = nil
+		notifyUI()
 	end)
 
 	LoadoutChanged.OnClientEvent:Connect(function(loadout, unlocked)

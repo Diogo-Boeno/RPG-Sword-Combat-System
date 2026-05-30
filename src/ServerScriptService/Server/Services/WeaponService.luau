@@ -16,8 +16,8 @@ local WeaponRegistry = require(ReplicatedStorage:WaitForChild("WeaponRegistry"))
 local WeaponService = {}
 
 local Remotes
-local EquipWeapon, UnequipWeapon, LoadoutChanged, WeaponEquipped, WeaponUnequipped
-local MoveToHand, MoveToScabbard
+local EquipWeapon, LoadoutChanged, WeaponEquipped, WeaponUnequipped
+local MoveToHand, MoveToScabbard, SheathFinish
 local WeaponsFolder, OriginalHipAttach
 
 -- ─── Helpers ─────────────────────────────────────────────────
@@ -136,11 +136,24 @@ end
 
 -- ─── Equip / Unequip ───────────────────────────────────────────
 
+local MAX_PENDING = 1   -- máximo de requests enfileirados além do que está executando
+local BUSY_TIMEOUT = 2  -- segundos: failsafe caso o client não confirme o fim da animação
+local playerQueues = {}
+local processingQueue = {}
+local weaponBusy = {}   -- player -> true enquanto sheath/unsheath está rolando
+local busyToken = {}    -- token pra invalidar timeouts antigos
+local equippedWeapon = {} -- player -> weaponName | FONTE DE VERDADE do que está SACADO.
+                          -- NÃO usar getEquippedModel pra decidir equip/unequip: o model
+                          -- da lâmina persiste guardado na bainha, então ele mente.
+
 local function doUnequip(player)
 	local character = player.Character
-	if not character then return end
+	if not character then return false end
+	if not equippedWeapon[player] then return false end
+	equippedWeapon[player] = nil
 	WeaponUnequipped:FireClient(player)
 	character:SetAttribute("State", "Sheathing")
+	return true
 end
 
 local function ensureScabbard(player, weaponName)
@@ -209,11 +222,11 @@ end
 
 local function doEquip(player, slotIndex)
 	local character = player.Character
-	if not character then return end
+	if not character then return false end
 
 	local loadout = DataManager.GetLoadout(player)
 	local weaponName = loadout[slotIndex]
-	if not weaponName then return end
+	if not weaponName then return false end
 
 	local scabbardModel = ensureScabbard(player, weaponName)
 
@@ -221,7 +234,7 @@ local function doEquip(player, slotIndex)
 	if current then current:Destroy() end
 
 	local template = getTemplate(weaponName)
-	if not template then warn("Template não encontrado: " .. weaponName); return end
+	if not template then warn("Template não encontrado: " .. weaponName); return false end
 
 	local bladeModel = Instance.new("Model")
 	bladeModel.Name = weaponName
@@ -257,7 +270,101 @@ local function doEquip(player, slotIndex)
 		warn("[WeaponService] Erro ao conectar: Verifique MainPart e Attachments.")
 	end
 
+	character:SetAttribute("State", "Unsheathing")
+	equippedWeapon[player] = weaponName
 	WeaponEquipped:FireClient(player, weaponName, bladeModel)
+	return true
+end
+
+local processQueue -- forward declaration
+
+-- Libera o busy (cedo, via SheathFinish) e tenta o próximo da fila.
+local function clearBusy(player)
+	weaponBusy[player] = false
+	busyToken[player] = nil
+	local character = player.Character
+	if character then
+		local state = character:GetAttribute("State")
+		if state == "Sheathing" or state == "Unsheathing" then
+			character:SetAttribute("State", "Idle")
+		end
+	end
+	processQueue(player)
+end
+
+-- Marca busy + agenda failsafe: se o client nunca confirmar, libera sozinho.
+local function setBusy(player)
+	weaponBusy[player] = true
+	local token = {}
+	busyToken[player] = token
+	task.delay(BUSY_TIMEOUT, function()
+		if busyToken[player] == token then
+			clearBusy(player)
+		end
+	end)
+end
+
+-- Bloqueia equip/unequip só durante ataque/stun (esses têm timer próprio).
+local function isCombatBusy(character)
+	local state = character:GetAttribute("State")
+	return state == "Attacking" or state == "Stunned"
+end
+
+function processQueue(player)
+	if processingQueue[player] then return end
+	if weaponBusy[player] then return end
+
+	local queue = playerQueues[player]
+	if not queue or #queue == 0 then return end
+
+	local character = player.Character
+	if not character then
+		playerQueues[player] = nil
+		return
+	end
+
+	if isCombatBusy(character) then return end
+
+	processingQueue[player] = true
+	local request = table.remove(queue, 1)
+
+	-- Decisão autoritativa contra equippedWeapon (não contra o model, que persiste guardado).
+	-- O client só manda o slot; o server decide equip vs unequip.
+	local equipped = equippedWeapon[player]
+	local loadout = DataManager.GetLoadout(player)
+	local targetName = loadout[request.slot]
+
+	local started = false
+	if equipped and equipped == targetName then
+		started = doUnequip(player)          -- mesma arma sacada -> guarda
+	elseif targetName then
+		started = doEquip(player, request.slot) -- nada sacado, ou troca de arma -> saca
+	end
+
+	processingQueue[player] = false
+
+	if #queue == 0 then
+		playerQueues[player] = nil
+	end
+
+	if started then
+		setBusy(player)
+	else
+		-- Nada aconteceu (slot inválido etc): tenta o próximo imediatamente.
+		processQueue(player)
+	end
+end
+
+local function enqueue(player, request)
+	if not playerQueues[player] then
+		playerQueues[player] = {}
+	end
+	-- Cap: spam de cliques não acumula. Mantém só os primeiros MAX_PENDING.
+	if #playerQueues[player] >= MAX_PENDING then
+		return
+	end
+	table.insert(playerQueues[player], request)
+	processQueue(player)
 end
 
 -- ─── Setup por character ──────────────────────────────────────────
@@ -271,6 +378,19 @@ local function setupCharacter(player, character)
 
 	local old = getEquippedModel(character)
 	if old then old:Destroy() end
+
+	playerQueues[player] = nil
+	processingQueue[player] = false
+	weaponBusy[player] = false
+	busyToken[player] = nil
+	equippedWeapon[player] = nil
+
+	-- Quando o ataque/stun termina (State volta pra Idle), tenta a fila.
+	character:GetAttributeChangedSignal("State"):Connect(function()
+		if character:GetAttribute("State") == "Idle" then
+			processQueue(player)
+		end
+	end)
 
 	local data = DataManager.WaitForData(player, 10)
 	if data then
@@ -297,20 +417,21 @@ end
 -- ─── Lifecycle ───────────────────────────────────────────────────
 
 function WeaponService:Init()
-	Remotes          = ReplicatedStorage:WaitForChild("Remotes")
-	EquipWeapon      = Remotes:WaitForChild("EquipWeapon")
-	UnequipWeapon    = Remotes:WaitForChild("UnequipWeapon")
-	LoadoutChanged   = Remotes:WaitForChild("LoadoutChanged")
-	WeaponEquipped   = Remotes:WaitForChild("WeaponEquipped")
+	Remotes = ReplicatedStorage:WaitForChild("Remotes")
+	EquipWeapon = Remotes:WaitForChild("EquipWeapon")
+	LoadoutChanged = Remotes:WaitForChild("LoadoutChanged")
+	WeaponEquipped = Remotes:WaitForChild("WeaponEquipped")
 	WeaponUnequipped = Remotes:WaitForChild("WeaponUnequipped")
-	MoveToHand       = Remotes:WaitForChild("MoveToHand")
-	MoveToScabbard   = Remotes:WaitForChild("MoveToScabbard")
+	MoveToHand = Remotes:WaitForChild("MoveToHand")
+	MoveToScabbard = Remotes:WaitForChild("MoveToScabbard")
+	SheathFinish = Remotes:WaitForChild("SheathFinish")
 
 	WeaponsFolder     = ServerStorage:WaitForChild("Weapons")
 	OriginalHipAttach = ServerStorage:WaitForChild("Assets"):WaitForChild("HipAttach")
 end
 
 function WeaponService:Start()
+	-- Marker (meio da animação): só prende a lâmina na mão. NÃO libera a fila ainda.
 	MoveToHand.OnServerEvent:Connect(function(player)
 		local character = player.Character
 		if not character then return end
@@ -325,10 +446,27 @@ function WeaponService:Start()
 		if model then attachBladeToScabbard(character, model) end
 	end)
 
-	EquipWeapon.OnServerEvent:Connect(doEquip)
-	UnequipWeapon.OnServerEvent:Connect(doUnequip)
+	-- Fim da animação de sheath OU unsheath: libera o busy cedo.
+	SheathFinish.OnServerEvent:Connect(function(player)
+		if weaponBusy[player] then
+			clearBusy(player)
+		end
+	end)
+
+	-- Client só manda o slot pressionado; o server decide equip vs unequip.
+	EquipWeapon.OnServerEvent:Connect(function(player, slotIndex)
+		if type(slotIndex) ~= "number" then return end
+		enqueue(player, { slot = slotIndex })
+	end)
 
 	Players.PlayerAdded:Connect(bindPlayer)
+	Players.PlayerRemoving:Connect(function(player)
+		playerQueues[player] = nil
+		processingQueue[player] = nil
+		weaponBusy[player] = nil
+		busyToken[player] = nil
+		equippedWeapon[player] = nil
+	end)
 	for _, p in ipairs(Players:GetPlayers()) do
 		bindPlayer(p)
 	end
