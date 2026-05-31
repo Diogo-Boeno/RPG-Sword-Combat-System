@@ -304,10 +304,10 @@ local function setBusy(player)
 	end)
 end
 
--- Bloqueia equip/unequip só durante ataque/stun (esses têm timer próprio).
+-- Bloqueia equip/unequip durante ataque/stun/roll (esses têm timer próprio).
 local function isCombatBusy(character)
 	local state = character:GetAttribute("State")
-	return state == "Attacking" or state == "Stunned"
+	return state == "Attacking" or state == "Stunned" or state == "Dodging"
 end
 
 function processQueue(player)

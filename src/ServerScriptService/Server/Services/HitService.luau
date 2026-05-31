@@ -100,6 +100,9 @@ local function processCombat(attackerChar, weaponName, target)
 	local targetRoot = target:FindFirstChild("HumanoidRootPart")
 	if not targetHum or not targetRoot or targetHum.Health <= 0 then return end
 
+	-- Esquiva: durante os i-frames do roll, o hit é totalmente ignorado.
+	if target:GetAttribute("IFrames") then return end
+
 	local stats      = WeaponSettings[weaponName] or { Damage = 10, PostureDamage = 20 }
 	local isParrying = target:GetAttribute("ParryWindow")
 	local isBlocking = target:GetAttribute("IsBlocking")
@@ -226,7 +229,7 @@ end
 function HitService:Start()
 	SwordHitEvent.OnServerEvent:Connect(onPlayerEvent)
 	NPCHitBindable.Event:Connect(onNPCHit)
-	HitService.NPCHit:Connect(onNPCHit) -- novo Signal espelhado
+	HitService.NPCHit:Connect(onNPCHit)
 end
 
 return HitService
