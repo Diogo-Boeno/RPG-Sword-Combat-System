@@ -24,8 +24,8 @@ local function buildGui()
 	local holder = Instance.new("Frame")
 	holder.Name = "ParryBar"
 	holder.AnchorPoint = Vector2.new(0.5, 1)
-	holder.Position = UDim2.new(0.5, 0, 0.86, 0)   -- centro, acima do hotbar
-	holder.Size = UDim2.new(0, 620, 0, 14)
+	holder.Position = UDim2.new(0.5, 0, 0.88, 0)   -- centro, acima do hotbar
+	holder.Size = UDim2.new(0, 620, 0, 10)
 	holder.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 	holder.BackgroundTransparency = 0.3
 	holder.BorderSizePixel = 0

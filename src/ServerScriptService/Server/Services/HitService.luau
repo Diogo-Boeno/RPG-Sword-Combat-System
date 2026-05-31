@@ -190,6 +190,9 @@ local function onPlayerEvent(player, action, weaponName, target)
 	elseif action == "BlockStart" then
 		-- Durante o cooldown de parry, o block fica travado (tem que dar dodge).
 		if character:GetAttribute("OnParryCD") then return end
+		-- Já tem uma janela de parry rolando: ignora (senão spam reseta o token
+		-- e nunca vira whiff). Uma tentativa de parry de cada vez.
+		if parryToken[character] then return end
 
 		character:SetAttribute("IsBlocking", true)
 		character:SetAttribute("ParryWindow", true)

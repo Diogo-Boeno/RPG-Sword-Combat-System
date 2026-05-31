@@ -33,36 +33,36 @@ local WeaponRegistry = {}
 -- ─────────────────────────────────────────────────────────────
 
 WeaponRegistry["Katana"] = {
-    DisplayName   = "Katana",
-    Description   = "Uma lâmina japonesa veloz. Combos rápidos e dano moderado.",
-    Icon          = "rbxassetid://0", -- substitua pelo seu asset
+    DisplayName = "Katana",
+    Description = "Uma lâmina japonesa veloz. Combos rápidos e dano moderado.",
+    Icon = "rbxassetid://0", -- substitua pelo seu asset
 
-    Damage        = 10,
+    Damage = 10,
     PostureDamage = 15,
-    SwingSpeed    = 1.2,
-    Cooldown      = 0.5,
-    ComboCount    = 3,
+    SwingSpeed = 1.2,
+    Cooldown = 0.5,
+    ComboCount = 3,
 
-    Type          = "Melee",
-    Rarity        = "Common",
-    DefaultSlot   = 1,
+    Type = "Melee",
+    Rarity = "Common",
+    DefaultSlot = 1,
     StarterWeapon = true,
 }
 
 WeaponRegistry["Spear"] = {
-    DisplayName   = "Spear",
-    Description   = "Alcance longo e alto dano de postura.",
-    Icon          = "rbxassetid://0",
+    DisplayName = "Spear",
+    Description = "Alcance longo e alto dano de postura.",
+    Icon = "rbxassetid://0",
 
-    Damage        = 15,
+    Damage = 15,
     PostureDamage = 20,
-    SwingSpeed    = 1.0,
-    Cooldown      = 0.5,
-    ComboCount    = 3,
+    SwingSpeed = 1.0,
+    Cooldown = 0.5,
+    ComboCount = 3,
 
-    Type          = "Melee",
-    Rarity        = "Uncommon",
-    DefaultSlot   = 2,
+    Type = "Melee",
+    Rarity = "Uncommon",
+    DefaultSlot = 2,
     StarterWeapon = false,
 }
 
