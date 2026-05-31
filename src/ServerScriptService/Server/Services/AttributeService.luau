@@ -15,6 +15,7 @@ local DEFAULTS = {
 	ParryWindow = false,
 	IsBlocking  = false,
 	IFrames     = false,
+	OnParryCD   = false,
 }
 
 local function setupCharacter(character)

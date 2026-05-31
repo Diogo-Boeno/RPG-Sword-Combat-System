@@ -28,6 +28,13 @@ HitService.NPCHit = Signal.new()
 local RECOIL_ANIM_ID = 137757449633828
 local PARRY_ANIMS    = {121138324921103, 132553186957346}
 
+local PARRY_WINDOW   = 0.30  -- janela em que o block deflete (parry)
+local PARRY_COOLDOWN = 1.25      -- penalidade de "parry atoa" (whiff): trava o block
+
+-- character -> token da janela de parry atual. Consumido quando um parry acerta;
+-- se sobreviver até o fim da janela, foi whiff (parry atoa) -> cooldown.
+local parryToken = {}
+
 local WeaponSettings
 local HitEffectPrefab, ParryEffectPrefab, BlockEffectPrefab, Sounds
 local SwordHitEvent
@@ -108,6 +115,9 @@ local function processCombat(attackerChar, weaponName, target)
 	local isBlocking = target:GetAttribute("IsBlocking")
 
 	if isParrying then
+		-- Parry acertou: consome o token pra NÃO contar como whiff (sem cooldown).
+		parryToken[target] = nil
+
 		playVisualEffect(target, ParryEffectPrefab, 15)
 		playSound("Parried", targetRoot)
 
@@ -178,11 +188,29 @@ local function onPlayerEvent(player, action, weaponName, target)
 		end
 		return
 	elseif action == "BlockStart" then
+		-- Durante o cooldown de parry, o block fica travado (tem que dar dodge).
+		if character:GetAttribute("OnParryCD") then return end
+
 		character:SetAttribute("IsBlocking", true)
 		character:SetAttribute("ParryWindow", true)
-		task.delay(0.30, function()
-			if character and character.Parent then
-				character:SetAttribute("ParryWindow", false)
+
+		local token = {}
+		parryToken[character] = token
+
+		task.delay(PARRY_WINDOW, function()
+			if not character.Parent then return end
+			character:SetAttribute("ParryWindow", false)
+
+			-- Se o token sobreviveu, nenhum parry acertou -> whiff (parry atoa).
+			if parryToken[character] == token then
+				parryToken[character] = nil
+				character:SetAttribute("OnParryCD", true)
+				Net:FireClient("ParryWhiff", player, PARRY_COOLDOWN)
+				task.delay(PARRY_COOLDOWN, function()
+					if character and character.Parent then
+						character:SetAttribute("OnParryCD", false)
+					end
+				end)
 			end
 		end)
 		return
@@ -216,6 +244,9 @@ function HitService:Init()
 		SwordHitEvent.Name = "SwordHit"
 		SwordHitEvent.Parent = ReplicatedStorage
 	end
+
+	-- Cria o remote do parry no boot pro client conseguir :OnClientEvent sem timeout.
+	Net:GetEvent("ParryWhiff")
 
 	-- BindableEvent que os Dummys/NPCs procuram com :WaitForChild("NPCHit")
 	NPCHitBindable = ServerScriptService:FindFirstChild("NPCHit")

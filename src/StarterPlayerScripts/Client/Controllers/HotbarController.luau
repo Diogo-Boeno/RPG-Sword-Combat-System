@@ -1,12 +1,5 @@
---[[
-	HotbarController
-	Keybinds 1-9 / 0 pra hotbar de armas. Comunica com WeaponService via Remotes
-	e renderiza os slots do HotbarGui (Number, ItemName, preview 3D, UIStroke ativo).
-	Era: StarterPlayerScripts.HotbarClient
---]]
-
-local Players           = game:GetService("Players")
-local UserInputService  = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local WeaponRegistry = require(ReplicatedStorage:WaitForChild("WeaponRegistry"))
@@ -19,14 +12,14 @@ local EquipWeapon, WeaponEquipped, WeaponUnequipped, LoadoutChanged
 local previewsFolder
 
 local hotbarLoadout = {}
-local currentSlot   = nil
+local currentSlot = nil
 
 local hotbarFrame -- HotbarGui.HotbarFrame (cache)
 
-local SLOT_COUNT       = 10
+local SLOT_COUNT = 10
 local STROKE_THICKNESS = 2
-local ACTIVE_STROKE    = Color3.fromRGB(255, 255, 255)   -- branco no slot equipado
-local VIEWPORT_ZOOM    = 0.8   -- menor = mais perto (mais zoom)
+local ACTIVE_STROKE = Color3.fromRGB(255, 255, 255)   -- branco no slot equipado
+local VIEWPORT_ZOOM = 0.8   -- menor = mais perto (mais zoom)
 
 local KEY_TO_SLOT = {
 	[Enum.KeyCode.One] = 1,   [Enum.KeyCode.Two] = 2,  [Enum.KeyCode.Three] = 3,

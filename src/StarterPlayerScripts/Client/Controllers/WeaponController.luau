@@ -133,6 +133,8 @@ local function startBlock()
 	if not canAttack or isBlocking or isSheathing then
 		return
 	end
+	-- Parry em cooldown (whiff anterior): block travado, tem que dar dodge.
+	if character:GetAttribute("OnParryCD") then return end
 	isBlocking = true
 	humanoid.WalkSpeed = 10
 	if idleTrack then idleTrack:Stop(0.2) end
