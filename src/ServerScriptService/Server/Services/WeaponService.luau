@@ -1,12 +1,6 @@
---[[
-	WeaponService
-	Equip / unequip de armas, scabbard, Motor6D, etc.
-	Era: ServerScriptService.WeaponServer
---]]
-
-local Players             = game:GetService("Players")
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
-local ServerStorage       = game:GetService("ServerStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 -- DataManager continua em ServerScriptService.DataManager (não foi migrado)
@@ -20,7 +14,7 @@ local EquipWeapon, LoadoutChanged, WeaponEquipped, WeaponUnequipped
 local MoveToHand, MoveToScabbard, SheathFinish
 local WeaponsFolder, OriginalHipAttach
 
--- ─── Helpers ─────────────────────────────────────────────────
+-- Helpers
 
 local function getTemplate(weaponName)
 	local t = WeaponsFolder:FindFirstChild(weaponName)

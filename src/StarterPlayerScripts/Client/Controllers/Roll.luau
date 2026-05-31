@@ -1,10 +1,3 @@
---[[
-	Roll / Dodge
-	Q pra rolar. Movimento + animação rodam local (replicam sozinhos porque o
-	client é dono do personagem). i-frames, State e cooldown são autoritativos
-	no server (RollService).
---]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -19,9 +12,9 @@ local player = Players.LocalPlayer
 -- ─── Tunables (devem casar com o RollService) ────────────────────
 local ROLL_ANIM_ID = 77751651570691-- TODO: cole aqui o ID da sua animação Roll (só o número)
 local ROLL_KEY = Enum.KeyCode.Q
-local ROLL_SPEED = 38 -- studs/seg do impulso horizontal
+local ROLL_SPEED = 30 -- studs/seg do impulso horizontal
 local ROLL_TIME = 0.5 -- duração do deslocamento
-local COOLDOWN = 1.2 -- cooldown local (feedback; o server é a verdade)
+local COOLDOWN = 1 -- cooldown local (feedback; o server é a verdade)
 
 -- ─── Estado por character ────────────────────────────────────────
 local character, humanoid, rootPart, animator
