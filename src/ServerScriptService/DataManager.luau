@@ -35,6 +35,11 @@ local function buildDefaultData()
     local data = {
         unlockedWeapons = {},
         loadout         = {},
+        -- RPG
+        level           = 1,
+        xp              = 0,
+        -- Inventário de consumíveis: { [itemName] = quantidade }
+        items           = {},
     }
     -- Concede automaticamente armas com StarterWeapon = true
     for weaponName, config in pairs(WeaponRegistry) do
@@ -193,6 +198,57 @@ function DataManager.UnlockWeapon(player, weaponName)
     table.insert(data.unlockedWeapons, weaponName)
     saveData(player)
     return true
+end
+
+-- ─── RPG: Level / XP ─────────────────────────────────────────
+
+function DataManager.GetLevel(player)
+    local data = cache[player.UserId]
+    return data and data.level or 1
+end
+
+function DataManager.GetXP(player)
+    local data = cache[player.UserId]
+    return data and data.xp or 0
+end
+
+-- Seta level e xp diretamente (usado pelo LevelService) e salva.
+function DataManager.SetLevelXP(player, level, xp)
+    local data = cache[player.UserId]
+    if not data then return end
+    data.level = level
+    data.xp = xp
+    saveData(player)
+end
+
+-- ─── RPG: Itens / Consumíveis ────────────────────────────────
+
+function DataManager.GetItems(player)
+    local data = cache[player.UserId]
+    return data and data.items or {}
+end
+
+function DataManager.GetItemCount(player, itemName)
+    local data = cache[player.UserId]
+    if not data then return 0 end
+    return data.items[itemName] or 0
+end
+
+-- Adiciona N de um item (N pode ser negativo pra remover). Não deixa abaixo de 0.
+-- Retorna a nova quantidade.
+function DataManager.AddItem(player, itemName, amount)
+    local data = cache[player.UserId]
+    if not data then return 0 end
+    amount = amount or 1
+    local current = data.items[itemName] or 0
+    local newCount = math.max(0, current + amount)
+    if newCount == 0 then
+        data.items[itemName] = nil
+    else
+        data.items[itemName] = newCount
+    end
+    saveData(player)
+    return newCount
 end
 
 return DataManager

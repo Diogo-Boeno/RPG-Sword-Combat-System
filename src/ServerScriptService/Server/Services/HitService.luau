@@ -98,6 +98,45 @@ local function applyStun(char, duration, speed)
 	end)
 end
 
+-- Guardbreak: stun pesado SEM defesa. Força desligar block/parry, trava o block
+-- durante o stun (OnParryCD) e toca a anim de hit repetida ("paradasso tomando hit").
+local GOTHIT_ANIM = 76890570463381
+local function applyGuardbreak(char, duration)
+	duration = duration or 2.5
+
+	-- Derruba toda a defesa
+	char:SetAttribute("IsBlocking", false)
+	char:SetAttribute("ParryWindow", false)
+	parryToken[char] = nil
+	char:SetAttribute("OnParryCD", true) -- não consegue blockar/parry durante o stun
+
+	char:SetAttribute("State", "Stunned")
+	char:SetAttribute("IsStunned", true)
+
+	local hum = char:FindFirstChild("Humanoid")
+	if hum then
+		hum.WalkSpeed = 0  -- paradasso
+		-- Toca a anim de hit em loop curto enquanto dura o stun
+		task.spawn(function()
+			local elapsed = 0
+			while elapsed < duration and char.Parent and char:GetAttribute("IsStunned") do
+				playAnim(hum, GOTHIT_ANIM, 1)
+				task.wait(0.6)
+				elapsed += 0.6
+			end
+		end)
+	end
+
+	task.delay(duration, function()
+		if char and char.Parent and char:GetAttribute("IsStunned") == true then
+			char:SetAttribute("State", "Idle")
+			char:SetAttribute("IsStunned", false)
+			char:SetAttribute("OnParryCD", false)
+			if hum then hum.WalkSpeed = 16 end
+		end
+	end)
+end
+
 -- ─── Combat Core (NPC + Player share this) ────────────────────
 
 local function processCombat(attackerChar, weaponName, target)
@@ -150,7 +189,7 @@ local function processCombat(attackerChar, weaponName, target)
 		if posture <= 0 then
 			target:SetAttribute("Posture", 100)
 			playSound("Guardbreak", targetRoot)
-			applyStun(target, 2.5, 0)
+			applyGuardbreak(target, 2.5)
 		else
 			targetHum:TakeDamage(stats.Damage * 0.2)
 			playAnim(targetHum, stats.HitAnim or 76890570463381, 1.2)
@@ -159,6 +198,14 @@ local function processCombat(attackerChar, weaponName, target)
 	end
 
 	-- Hit
+	-- Marca quem causou o último dano (pro LevelService dar XP a quem matou).
+	if attackerChar then
+		local attackerPlayer = game:GetService("Players"):GetPlayerFromCharacter(attackerChar)
+		if attackerPlayer then
+			target:SetAttribute("LastAttackerUserId", attackerPlayer.UserId)
+			target:SetAttribute("LastHitTime", os.clock())
+		end
+	end
 	targetHum:TakeDamage(stats.Damage)
 	if attackerChar then
 		attackerChar:SetAttribute("Posture", math.min((attackerChar:GetAttribute("Posture") or 100) + 5, 100))
